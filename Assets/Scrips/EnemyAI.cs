@@ -1,41 +1,39 @@
 using UnityEngine;
-using UnityEngine.AI; // สำคัญมากสำหรับ NavMeshAgent
+using UnityEngine.AI; // สำคัญมาก
 
 public class EnemyAI : MonoBehaviour
 {
-    public NavMeshAgent agent;
-
+    // References
+    private NavMeshAgent agent;
     public Transform player;
-
     public LayerMask whatIsGround, whatIsPlayer;
 
-    // การลาดตระเวน (Patrolling)
-    public Vector3 walkPoint;
-    bool walkPointSet;
+    // Patrolling
+    private Vector3 walkPoint;
+    private bool walkPointSet;
     public float walkPointRange;
 
-    // การโจมตี (Attacking)
+    // Attacking
     public float timeBetweenAttacks;
-    bool alreadyAttacked;
-    // public GameObject projectile; // หากต้องการให้ยิงอะไรออกมา
+    private bool alreadyAttacked;
 
-    // สถานะของ AI (States)
+    // States
     public float sightRange, attackRange;
-    public bool playerInSightRange, playerInAttackRange;
+    private bool playerInSightRange, playerInAttackRange;
 
     private void Awake()
     {
-        // player = GameObject.Find("Player").transform; // <--- ลบ หรือใส่ // หน้าบรรทัดนี้
+        // Get references automatically
         agent = GetComponent<NavMeshAgent>();
     }
 
     private void Update()
     {
-        // ตรวจสอบระยะการมองเห็นและการโจมตี
+        // Check for sight and attack range
         playerInSightRange = Physics.CheckSphere(transform.position, sightRange, whatIsPlayer);
         playerInAttackRange = Physics.CheckSphere(transform.position, attackRange, whatIsPlayer);
 
-        // จัดการสถานะของ AI
+        // State machine logic
         if (!playerInSightRange && !playerInAttackRange) Patrolling();
         if (playerInSightRange && !playerInAttackRange) ChasePlayer();
         if (playerInAttackRange && playerInSightRange) AttackPlayer();
@@ -49,23 +47,23 @@ public class EnemyAI : MonoBehaviour
             agent.SetDestination(walkPoint);
 
         Vector3 distanceToWalkPoint = transform.position - walkPoint;
-
-        // เมื่อไปถึงจุดหมาย
         if (distanceToWalkPoint.magnitude < 1f)
             walkPointSet = false;
     }
 
     private void SearchWalkPoint()
     {
-        // คำนวณหาจุดเดินแบบสุ่มในระยะที่กำหนด
+        // Find a random point within the walkPointRange
         float randomZ = Random.Range(-walkPointRange, walkPointRange);
         float randomX = Random.Range(-walkPointRange, walkPointRange);
+        Vector3 randomPoint = new Vector3(transform.position.x + randomX, transform.position.y, transform.position.z + randomZ);
 
-        walkPoint = new Vector3(transform.position.x + randomX, transform.position.y, transform.position.z + randomZ);
-
-        // ตรวจสอบว่าจุดสุ่มนั้นอยู่บนพื้น (NavMesh) หรือไม่
-        if (Physics.Raycast(walkPoint, -transform.up, 2f, whatIsGround))
+        // Check if the point is on the NavMesh
+        if (NavMesh.SamplePosition(randomPoint, out NavMeshHit hit, 1.0f, NavMesh.AllAreas))
+        {
+            walkPoint = hit.position;
             walkPointSet = true;
+        }
     }
 
     private void ChasePlayer()
@@ -75,21 +73,13 @@ public class EnemyAI : MonoBehaviour
 
     private void AttackPlayer()
     {
-        // ทำให้ศัตรูหยุดเดินและหันหน้าหาผู้เล่น
+        // Stop moving and look at the player
         agent.SetDestination(transform.position);
         transform.LookAt(player);
 
         if (!alreadyAttacked)
         {
-            // --- โค้ดส่วนการโจมตี ---
-            // หากต้องการให้ยิง projectile ให้ un-comment บรรทัดด้านล่าง
-            // Rigidbody rb = Instantiate(projectile, transform.position, Quaternion.identity).GetComponent<Rigidbody>();
-            // rb.AddForce(transform.forward * 32f, ForceMode.Impulse);
-            // rb.AddForce(transform.up * 8f, ForceMode.Impulse);
-
-            Debug.Log("Enemy is attacking Player!"); // แสดงข้อความใน Console ว่ากำลังโจมตี
-            // --------------------
-
+            Debug.Log(gameObject.name + " is attacking!");
             alreadyAttacked = true;
             Invoke(nameof(ResetAttack), timeBetweenAttacks);
         }
@@ -100,7 +90,7 @@ public class EnemyAI : MonoBehaviour
         alreadyAttacked = false;
     }
 
-    // --- วาด Gizmos เพื่อให้เห็นระยะใน Editor (ไม่จำเป็นต่อการทำงาน) ---
+    // Draw gizmos in the editor to see the ranges
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
