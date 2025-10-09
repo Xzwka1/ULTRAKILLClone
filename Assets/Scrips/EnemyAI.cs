@@ -15,6 +15,7 @@ public class EnemyAI : MonoBehaviour
 
     // Attacking
     public float timeBetweenAttacks;
+    public int attackDamage = 15; // ความแรงในการโจมตี
     private bool alreadyAttacked;
 
     // States
@@ -79,7 +80,18 @@ public class EnemyAI : MonoBehaviour
 
         if (!alreadyAttacked)
         {
-            Debug.Log(gameObject.name + " is attacking!");
+            // --- ส่วนที่เพิ่มเข้ามา ---
+            // 1. ลองหา PlayerHealth component บนเป้าหมาย (Player)
+            PlayerHealth playerHealth = player.GetComponent<PlayerHealth>();
+
+            // 2. ถ้าเจอ (ถ้าเป้าหมายมีสคริปต์ PlayerHealth)
+            if (playerHealth != null)
+            {
+                // 3. สั่งให้เป้าหมายรับดาเมจ
+                playerHealth.TakeDamage(attackDamage);
+            }
+            // ------------------
+
             alreadyAttacked = true;
             Invoke(nameof(ResetAttack), timeBetweenAttacks);
         }

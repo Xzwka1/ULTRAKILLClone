@@ -15,8 +15,10 @@ public class PlayerMove : MonoBehaviour
     private float standingHeight;
 
     [Header("Sliding")]
-    public float slideSpeed = 35f;
+    public float slideSpeed = 30f;
+    public float slideFriction = 15f;
     private Vector3 slideDirection;
+    private float currentSlideSpeed;
 
     [Header("Dashing")]
     public float dashSpeed = 40f;
@@ -48,6 +50,7 @@ public class PlayerMove : MonoBehaviour
     public float headbobAmplitude = 0.1f;
     [Space]
     public float dashFOV = 90f;
+    public float slideFOV = 100f;
     private float normalFOV;
     private float headbobTimer = 0f;
 
@@ -87,7 +90,6 @@ public class PlayerMove : MonoBehaviour
         standingCameraPos = playerCamera.localPosition;
         crouchCameraPos = new Vector3(standingCameraPos.x, standingCameraPos.y - (standingHeight - crouchHeight), standingCameraPos.z);
 
-        // Initialize wall run timer
         wallRunTimer = maxWallRunTime;
     }
 
@@ -110,7 +112,8 @@ public class PlayerMove : MonoBehaviour
 
     private void HandleCameraEffects()
     {
-        float targetFOV = isDashing ? dashFOV : normalFOV;
+        float targetFOV = isDashing ? dashFOV : (isSliding ? slideFOV : normalFOV);
+
         if (playerCameraComponent != null)
             playerCameraComponent.fieldOfView = Mathf.Lerp(playerCameraComponent.fieldOfView, targetFOV, Time.deltaTime * cameraChangeSpeed);
 
@@ -158,7 +161,7 @@ public class PlayerMove : MonoBehaviour
             return;
         }
 
-        playerVelocity.y = 0; // Prevent sliding down initially
+        playerVelocity.y = 0;
 
         Vector3 wallNormal = wallRight ? rightWallHit.normal : leftWallHit.normal;
         Vector3 wallForward = Vector3.Cross(wallNormal, transform.up);
@@ -176,33 +179,50 @@ public class PlayerMove : MonoBehaviour
         }
     }
 
+    private void SlidingMovement()
+    {
+        playercc.Move(slideDirection * currentSlideSpeed * Time.deltaTime);
+
+        currentSlideSpeed -= slideFriction * Time.deltaTime;
+
+        if (currentSlideSpeed <= playerSpeed)
+        {
+            StopSlide();
+        }
+    }
+
     void HandleMovement()
     {
         isGrounded = playercc.isGrounded;
         if (isGrounded && playerVelocity.y < 0)
         {
             playerVelocity.y = -2f;
-            if (wallRunTimer < maxWallRunTime) wallRunTimer = maxWallRunTime;
-        }
 
-        if (isWallRunning)
-        {
-            WallRunningMovement();
+            // --- FIX ---
+            // เคลียร์แรงส่งแนวนอนเมื่อแตะพื้น เพื่อแก้บัคสไลด์ค้าง
+            playerVelocity.x = 0f;
+            playerVelocity.z = 0f;
         }
 
         if (isDashing) return;
 
-        if (!isWallRunning)
+        if (isSliding)
+        {
+            SlidingMovement();
+        }
+        else if (isWallRunning)
+        {
+            WallRunningMovement();
+        }
+        else // เคลื่อนที่ปกติ
         {
             bool isSprinting = Input.GetKey(KeyCode.LeftShift) && !isCrouching && moveZ > 0;
             float currentSpeed = isCrouching ? crouchSpeed : (isSprinting ? sprintSpeed : playerSpeed);
             Vector3 moveDirection = transform.right * moveX + transform.forward * moveZ;
 
-            if (isSliding) playercc.Move(slideDirection * slideSpeed * Time.deltaTime);
-            else playercc.Move(moveDirection * currentSpeed * Time.deltaTime);
+            playercc.Move(moveDirection * currentSpeed * Time.deltaTime);
+            isPlayerWalking = moveDirection.magnitude >= 0.1f;
         }
-
-        isPlayerWalking = new Vector2(playercc.velocity.x, playercc.velocity.z).magnitude >= 0.1f;
 
         if (Input.GetButtonDown("Jump"))
         {
@@ -210,8 +230,9 @@ public class PlayerMove : MonoBehaviour
             else if ((wallLeft || wallRight) && !isGrounded && wallRunTimer > 0) StartWallRun();
             else if (isSliding)
             {
-                playerVelocity = slideDirection * slideSpeed;
+                playerVelocity = slideDirection * currentSlideSpeed;
                 playerVelocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+                StopSlide();
             }
             else if (isGrounded && !isCrouching)
             {
@@ -224,7 +245,7 @@ public class PlayerMove : MonoBehaviour
         if (isWallSliding) playerVelocity.y = Mathf.Clamp(playerVelocity.y, -wallSlideSpeed, float.MaxValue);
         else if (!isWallRunning) playerVelocity.y += gravity * Time.deltaTime;
 
-        if (!isWallRunning) playercc.Move(playerVelocity * Time.deltaTime);
+        if (!isSliding) playercc.Move(playerVelocity * Time.deltaTime);
     }
 
     private void WallJump()
@@ -252,8 +273,15 @@ public class PlayerMove : MonoBehaviour
 
     void HandleCrouchAndSlide()
     {
-        if (Input.GetKeyDown(KeyCode.LeftControl) && isPlayerWalking && isGrounded) StartSlide();
-        else if (Input.GetKeyUp(KeyCode.LeftControl)) StopSlide();
+        bool isSprinting = Input.GetKey(KeyCode.LeftShift) && !isCrouching && moveZ > 0;
+        if (Input.GetKeyDown(KeyCode.LeftControl) && isSprinting && isGrounded)
+        {
+            StartSlide();
+        }
+        else if (Input.GetKeyUp(KeyCode.LeftControl) && isSliding)
+        {
+            StopSlide();
+        }
 
         float targetHeight = isCrouching ? crouchHeight : standingHeight;
         playercc.height = Mathf.Lerp(playercc.height, targetHeight, Time.deltaTime * cameraChangeSpeed);
@@ -261,13 +289,16 @@ public class PlayerMove : MonoBehaviour
 
     private void StartSlide()
     {
-        isSliding = true; isCrouching = true;
-        slideDirection = (transform.forward * moveZ + transform.right * moveX).normalized;
+        isSliding = true;
+        isCrouching = true;
+        currentSlideSpeed = slideSpeed;
+        slideDirection = transform.forward;
     }
 
     private void StopSlide()
     {
-        isSliding = false; isCrouching = false;
+        isSliding = false;
+        isCrouching = false;
     }
 
     private IEnumerator Dash()
