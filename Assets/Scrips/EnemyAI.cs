@@ -74,23 +74,21 @@ public class EnemyAI : MonoBehaviour
 
     private void AttackPlayer()
     {
-        // Stop moving and look at the player
+        
         agent.SetDestination(transform.position);
         transform.LookAt(player);
 
         if (!alreadyAttacked)
         {
-            // --- ส่วนที่เพิ่มเข้ามา ---
-            // 1. ลองหา PlayerHealth component บนเป้าหมาย (Player)
+            
             PlayerHealth playerHealth = player.GetComponent<PlayerHealth>();
 
-            // 2. ถ้าเจอ (ถ้าเป้าหมายมีสคริปต์ PlayerHealth)
             if (playerHealth != null)
             {
-                // 3. สั่งให้เป้าหมายรับดาเมจ
+                
                 playerHealth.TakeDamage(attackDamage);
             }
-            // ------------------
+           
 
             alreadyAttacked = true;
             Invoke(nameof(ResetAttack), timeBetweenAttacks);
@@ -102,7 +100,7 @@ public class EnemyAI : MonoBehaviour
         alreadyAttacked = false;
     }
 
-    // Draw gizmos in the editor to see the ranges
+    
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
