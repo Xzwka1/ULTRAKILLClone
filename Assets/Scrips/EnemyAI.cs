@@ -26,10 +26,37 @@ public class EnemyAI : MonoBehaviour
     {
         // Get references automatically
         agent = GetComponent<NavMeshAgent>();
+
+        // --- ?? นี่คือส่วนที่เพิ่มเข้ามา ?? ---
+        // 1. ตรวจสอบว่าลาก Player มาใส่ใน Inspector หรือยัง
+        if (player == null)
+        {
+            // 2. ถ้ายัง (เป็น null) ให้ค้นหาอัตโนมัติด้วย Tag "Player"
+            GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+
+            // 3. ถ้าหาเจอ
+            if (playerObject != null)
+            {
+                // 4. เอา Transform ของ Player มาเก็บไว้
+                player = playerObject.transform;
+            }
+            else
+            {
+                // 5. (กันพลาด) ถ้าหาไม่เจอจริงๆ ให้ b?o l?i และปิดการทำงาน AI ตัวนี้
+                Debug.LogError(gameObject.name + ": Cannot find GameObject with tag 'Player'. AI will be disabled.");
+            }
+        }
+        // --- ?? จบส่วนที่เพิ่ม ?? ---
     }
 
     private void Update()
     {
+        // --- ?? เพิ่ม Safety Check ?? ---
+        // ถ้าหา Player ไม่เจอ (player ยังคงเป็น null) ให้หยุดทำงานฟังก์ชัน Update นี้ไปเลย
+        if (player == null)
+            return;
+        // --- ?? จบส่วนที่เพิ่ม ?? ---
+
         // Check for sight and attack range
         playerInSightRange = Physics.CheckSphere(transform.position, sightRange, whatIsPlayer);
         playerInAttackRange = Physics.CheckSphere(transform.position, attackRange, whatIsPlayer);
@@ -74,21 +101,21 @@ public class EnemyAI : MonoBehaviour
 
     private void AttackPlayer()
     {
-        
+
         agent.SetDestination(transform.position);
         transform.LookAt(player);
 
         if (!alreadyAttacked)
         {
-            
+
             PlayerHealth playerHealth = player.GetComponent<PlayerHealth>();
 
             if (playerHealth != null)
             {
-                
+
                 playerHealth.TakeDamage(attackDamage);
             }
-           
+
 
             alreadyAttacked = true;
             Invoke(nameof(ResetAttack), timeBetweenAttacks);
@@ -100,7 +127,7 @@ public class EnemyAI : MonoBehaviour
         alreadyAttacked = false;
     }
 
-    
+
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;

@@ -78,8 +78,15 @@ public class PlayerMove : MonoBehaviour
     private Vector3 standingCameraPos;
     private Vector3 crouchCameraPos;
 
+    // === ตัวแปรสำหรับ Respawn ===
+    private Vector3 respawnPoint;
+
     void Start()
     {
+        // === ตั้งค่าจุดเกิดเริ่มต้น ===
+        respawnPoint = transform.position;
+
+        // --- โค้ดเดิมของคุณ ---
         playercc = GetComponent<CharacterController>();
         Cursor.lockState = CursorLockMode.Locked;
 
@@ -182,9 +189,7 @@ public class PlayerMove : MonoBehaviour
     private void SlidingMovement()
     {
         playercc.Move(slideDirection * currentSlideSpeed * Time.deltaTime);
-
         currentSlideSpeed -= slideFriction * Time.deltaTime;
-
         if (currentSlideSpeed <= playerSpeed)
         {
             StopSlide();
@@ -197,9 +202,6 @@ public class PlayerMove : MonoBehaviour
         if (isGrounded && playerVelocity.y < 0)
         {
             playerVelocity.y = -2f;
-
-            // --- FIX ---
-            // เคลียร์แรงส่งแนวนอนเมื่อแตะพื้น เพื่อแก้บัคสไลด์ค้าง
             playerVelocity.x = 0f;
             playerVelocity.z = 0f;
         }
@@ -318,5 +320,50 @@ public class PlayerMove : MonoBehaviour
         }
         gravity = originalGravity;
         isDashing = false;
+    }
+
+
+    // === ฟังก์ชันสำหรับ Checkpoint และ Respawn ===
+
+    /// <summary>
+    /// (สาธารณะ) ใช้สำหรับให้ Checkpoint เรียก เพื่อตั้งจุดเกิดใหม่
+    /// </summary>
+    public void SetRespawnPoint(Vector3 newRespawnPoint)
+    {
+        respawnPoint = newRespawnPoint;
+        Debug.Log("Checkpoint Set to: " + newRespawnPoint);
+    }
+
+    /// <summary>
+    /// (สาธารณะ) ใช้สำหรับให้ PlayerHealth หรือ DeathZone เรียก เพื่อให้ผู้เล่นกลับไปจุดเซฟ
+    /// </summary>
+    public void Respawn()
+    {
+        Debug.Log("Player Respawned!");
+
+        // 1. ปิด/เปิด CharacterController เพื่อย้ายตำแหน่ง
+        if (playercc != null)
+        {
+            playercc.enabled = false;
+        }
+        transform.position = respawnPoint;
+        if (playercc != null)
+        {
+            playercc.enabled = true;
+        }
+
+        // 2. (สำคัญ) รีเซ็ตสถานะการเคลื่อนที่ทั้งหมด
+        playerVelocity = Vector3.zero;
+        isSliding = false;
+        isDashing = false;
+        isWallRunning = false;
+        isCrouching = false;
+        wallRunTimer = maxWallRunTime;
+
+        // 3. (แนะนำ) รีเซ็ตกล้องและความสูง
+        playercc.height = standingHeight;
+        playerCamera.localPosition = standingCameraPos;
+        if (playerCameraComponent != null)
+            playerCameraComponent.fieldOfView = normalFOV;
     }
 }
